@@ -6,15 +6,25 @@ from tkinter import ttk
 WINDOW_WIDTH = 600
 WINDOW_HEIGHT = 400
 
+BG_COLOR = "#1e1e1e"
+FG_COLOR = "#ffffff"
+ENTRY_BG = "#2b2b2b"
+ENTRY_FG = "#ffffff"
+BTN_BG = "#3a3a3a"
+BTN_FG = "#2e2d2d"
+HINT_FG = "#cfcfcf"
+OK_FG = "#00ff7f"
+BAD_FG = "#ff4d4d"
+
 
 class KanaGame:
 
     def __init__(self, master: tk.Tk) -> None:
-
         self.advance_locked = False
 
         self.master = master
         self.master.title("Yappanese Kana Racer")
+        self.master.configure(bg=BG_COLOR)
 
         self.include_katakana_var = tk.BooleanVar(value=True)
 
@@ -55,9 +65,9 @@ class KanaGame:
             'ワ': 'wa', 'ヲ': 'wo', 'ン': 'n',
         }
 
-        self.start_frame = tk.Frame(master)
-        self.game_frame = tk.Frame(master)
-        self.result_frame = tk.Frame(master)
+        self.start_frame = tk.Frame(master, bg=BG_COLOR)
+        self.game_frame = tk.Frame(master, bg=BG_COLOR)
+        self.result_frame = tk.Frame(master, bg=BG_COLOR)
 
         self.mode = None
         self.kana_list = []
@@ -73,6 +83,13 @@ class KanaGame:
         self.hint_btn = None
         self.hint_label = None
         self.feedback = None
+
+        self.style = ttk.Style()
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+        self.style.configure("TCheckbutton", background=BG_COLOR, foreground=FG_COLOR)
 
         self.setup_start_screen()
 
@@ -134,7 +151,6 @@ class KanaGame:
         centis = int(elapsed * 100) % 100
         return f"{minutes:02d}:{seconds:02d}:{centis:02d}"
 
-
     def setup_start_screen(self) -> None:
         self.stop_timer()
         self.start_time = None
@@ -142,7 +158,7 @@ class KanaGame:
         self.clear_frame(self.start_frame)
         self.start_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
-        top_bar = tk.Frame(self.start_frame)
+        top_bar = tk.Frame(self.start_frame, bg=BG_COLOR)
         top_bar.pack(fill="x", pady=(0, 10))
 
         self.katakana_toggle_start = ttk.Checkbutton(
@@ -152,22 +168,54 @@ class KanaGame:
         )
         self.katakana_toggle_start.pack(side="right")
 
-        tk.Label(self.start_frame, text="Yappanese Kana Racer", font=("Helvetica", 24)).pack(pady=10)
+        tk.Label(
+            self.start_frame,
+            text="Yappanese Kana Racer",
+            font=("Helvetica", 24),
+            bg=BG_COLOR,
+            fg=FG_COLOR
+        ).pack(pady=10)
 
         tk.Label(
             self.start_frame,
             text="Type the romaji for the shown kana.\nChoose a mode to begin.",
             font=("Helvetica", 12),
+            bg=BG_COLOR,
+            fg=FG_COLOR
         ).pack(pady=10)
 
-        tk.Button(self.start_frame, text="Classic Mode", width=20,
-                  command=lambda: self.start_game("classic")).pack(pady=5)
+        tk.Button(
+            self.start_frame,
+            text="Classic Mode",
+            width=20,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            command=lambda: self.start_game("classic")
+        ).pack(pady=5)
 
-        tk.Button(self.start_frame, text="Endless Mode", width=20,
-                  command=lambda: self.start_game("endless")).pack(pady=5)
+        tk.Button(
+            self.start_frame,
+            text="Endless Mode",
+            width=20,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            command=lambda: self.start_game("endless")
+        ).pack(pady=5)
 
-        tk.Button(self.start_frame, text="Quit", width=20,
-                  command=self.master.quit).pack(pady=5)
+        tk.Button(
+            self.start_frame,
+            text="Quit",
+            width=20,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            command=self.master.quit
+        ).pack(pady=5)
 
     def start_game(self, mode: str) -> None:
         self.mode = mode
@@ -178,39 +226,56 @@ class KanaGame:
         self.result_frame.pack_forget()
         self.game_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
-        top_bar = tk.Frame(self.game_frame)
+        top_bar = tk.Frame(self.game_frame, bg=BG_COLOR)
         top_bar.pack(fill="x", pady=(0, 10))
 
-        left_box = tk.Frame(top_bar)
+        left_box = tk.Frame(top_bar, bg=BG_COLOR)
         left_box.pack(side="left")
 
-        self.progress_label = tk.Label(left_box, text="0/0", font=("Helvetica", 12))
+        self.progress_label = tk.Label(left_box, text="0/0", font=("Helvetica", 12), bg=BG_COLOR, fg=FG_COLOR)
         self.progress_label.pack(anchor="w")
 
-        self.timer_label = tk.Label(left_box, text="00:00:00", font=("Helvetica", 12))
+        self.timer_label = tk.Label(left_box, text="00:00:00", font=("Helvetica", 12), bg=BG_COLOR, fg=FG_COLOR)
         self.timer_label.pack(anchor="w")
 
-        self.char_label = tk.Label(self.game_frame, text="", font=("Helvetica", 72), pady=20)
+        self.char_label = tk.Label(self.game_frame, text="", font=("Helvetica", 72), pady=20, bg=BG_COLOR, fg=FG_COLOR)
         self.char_label.pack()
 
         self.entry_var = tk.StringVar()
-        self.entry = tk.Entry(self.game_frame, textvariable=self.entry_var, font=("Helvetica", 20), width=15)
+        self.entry = tk.Entry(
+            self.game_frame,
+            textvariable=self.entry_var,
+            font=("Helvetica", 20),
+            width=15,
+            bg=ENTRY_BG,
+            fg=ENTRY_FG,
+            insertbackground=ENTRY_FG,
+        )
         self.entry.pack()
         self.entry.bind("<Return>", self.check_answer)
 
         self.entry.bind("<Tab>", self.on_tab_hint)
         self.master.bind("<Tab>", self.on_tab_hint)
 
-        hint_row = tk.Frame(self.game_frame)
+        hint_row = tk.Frame(self.game_frame, bg=BG_COLOR)
         hint_row.pack(pady=10)
 
-        self.hint_btn = tk.Button(hint_row, text="Hint", width=10, command=self.show_hint)
+        self.hint_btn = tk.Button(
+            hint_row,
+            text="Hint",
+            width=10,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            command=self.show_hint
+        )
         self.hint_btn.pack(side="left", padx=(0, 10))
 
-        self.hint_label = tk.Label(hint_row, text="", font=("Helvetica", 14))
+        self.hint_label = tk.Label(hint_row, text="", font=("Helvetica", 14), bg=BG_COLOR, fg=HINT_FG)
         self.hint_label.pack(side="left")
 
-        self.feedback = tk.Label(self.game_frame, text="", font=("Helvetica", 14))
+        self.feedback = tk.Label(self.game_frame, text="", font=("Helvetica", 14), bg=BG_COLOR, fg=FG_COLOR)
         self.feedback.pack(pady=10)
 
         self.stop_timer()
@@ -227,7 +292,6 @@ class KanaGame:
             if self.mode == "classic":
                 self.end_game()
                 return
-
             self.build_deck()
 
         total = len(self.kana_list)
@@ -242,7 +306,7 @@ class KanaGame:
         if self.entry_var is not None:
             self.entry_var.set("")
         if self.entry is not None:
-            self.entry.configure(fg="black", state="normal")
+            self.entry.configure(fg=ENTRY_FG)
             self.entry.focus_set()
 
         if self.feedback is not None:
@@ -267,10 +331,8 @@ class KanaGame:
             self.hint_btn.config(state="disabled")
 
     def check_answer(self, _event: tk.Event) -> None:
-
         if self.advance_locked:
             return
-
         if self.current_index >= len(self.kana_list):
             return
 
@@ -283,13 +345,13 @@ class KanaGame:
         if user_input == romaji:
             self.advance_locked = True
             if self.entry is not None:
-                self.entry.configure(fg="green")
-                self.entry.unbind("<Return>")
+                self.entry.configure(fg=OK_FG)
+                self.entry.unbind("<Return>")  # prevents double-enter skip
             self.master.after(200, self.next_character)
         else:
             self.wrong_flags[char] = True
             if self.entry is not None:
-                self.entry.configure(fg="red")
+                self.entry.configure(fg=BAD_FG)
             self.master.after(1000, self.clear_entry)
 
     def next_character(self) -> None:
@@ -300,7 +362,7 @@ class KanaGame:
         if self.entry_var is not None:
             self.entry_var.set("")
         if self.entry is not None:
-            self.entry.configure(fg="black")
+            self.entry.configure(fg=ENTRY_FG)
             self.entry.focus_set()
 
     def end_game(self) -> None:
@@ -329,14 +391,32 @@ class KanaGame:
             text=result_msg,
             font=("Helvetica", 16),
             wraplength=420,
-            justify="center"
+            justify="center",
+            bg=BG_COLOR,
+            fg=FG_COLOR
         ).pack(pady=20)
 
-        tk.Button(self.result_frame, text="Play Again", width=20,
-                  command=lambda: self.start_game(self.mode)).pack(pady=5)
+        tk.Button(
+            self.result_frame,
+            text="Play Again",
+            width=20,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            command=lambda: self.start_game(self.mode)
+        ).pack(pady=5)
 
-        tk.Button(self.result_frame, text="Main Menu", width=20,
-                  command=self.return_to_start).pack(pady=5)
+        tk.Button(
+            self.result_frame,
+            text="Main Menu",
+            width=20,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            command=self.return_to_start
+        ).pack(pady=5)
 
     def return_to_start(self) -> None:
         self.stop_timer()
