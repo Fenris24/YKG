@@ -10,7 +10,7 @@ BG_COLOR = "#1e1e1e"
 FG_COLOR = "#ffffff"
 ENTRY_BG = "#2b2b2b"
 ENTRY_FG = "#ffffff"
-BTN_BG = "#3a3a3a"
+BTN_BG = "#ffffff"
 BTN_FG = "#2e2d2d"
 HINT_FG = "#cfcfcf"
 OK_FG = "#00ff7f"
@@ -26,6 +26,8 @@ class KanaGame:
         self.master.title("Yappanese Kana Racer")
         self.master.configure(bg=BG_COLOR)
 
+        # Two toggles (menu-only)
+        self.include_hiragana_var = tk.BooleanVar(value=True)
         self.include_katakana_var = tk.BooleanVar(value=True)
 
         self.start_time = None
@@ -102,11 +104,12 @@ class KanaGame:
         return 'ぁ' <= ch <= 'ゟ'
 
     def build_deck(self) -> None:
+        include_hiragana = self.include_hiragana_var.get()
         include_katakana = self.include_katakana_var.get()
 
         items = []
         for ch, romaji in self.kana_romaji.items():
-            if self._is_hiragana(ch):
+            if include_hiragana and self._is_hiragana(ch):
                 items.append((ch, romaji))
             elif include_katakana and self._is_katakana(ch):
                 items.append((ch, romaji))
@@ -161,12 +164,21 @@ class KanaGame:
         top_bar = tk.Frame(self.start_frame, bg=BG_COLOR)
         top_bar.pack(fill="x", pady=(0, 10))
 
-        self.katakana_toggle_start = ttk.Checkbutton(
-            top_bar,
+        # Two toggles on the right
+        toggles = tk.Frame(top_bar, bg=BG_COLOR)
+        toggles.pack(side="right")
+
+        ttk.Checkbutton(
+            toggles,
+            text="Hiragana",
+            variable=self.include_hiragana_var,
+        ).pack(side="left", padx=(0, 10))
+
+        ttk.Checkbutton(
+            toggles,
             text="Katakana",
             variable=self.include_katakana_var,
-        )
-        self.katakana_toggle_start.pack(side="right")
+        ).pack(side="left")
 
         tk.Label(
             self.start_frame,
@@ -183,6 +195,10 @@ class KanaGame:
             bg=BG_COLOR,
             fg=FG_COLOR
         ).pack(pady=10)
+
+        # Message area for invalid selection (both toggles off)
+        self.menu_msg = tk.Label(self.start_frame, text="", font=("Helvetica", 11), bg=BG_COLOR, fg=BAD_FG)
+        self.menu_msg.pack(pady=(0, 10))
 
         tk.Button(
             self.start_frame,
@@ -218,6 +234,14 @@ class KanaGame:
         ).pack(pady=5)
 
     def start_game(self, mode: str) -> None:
+        # Must have at least one set enabled
+        if not self.include_hiragana_var.get() and not self.include_katakana_var.get():
+            if hasattr(self, "menu_msg") and self.menu_msg is not None:
+                self.menu_msg.config(text="Enable Hiragana and/or Katakana to start.")
+            return
+        if hasattr(self, "menu_msg") and self.menu_msg is not None:
+            self.menu_msg.config(text="")
+
         self.mode = mode
         self.build_deck()
 
@@ -346,7 +370,7 @@ class KanaGame:
             self.advance_locked = True
             if self.entry is not None:
                 self.entry.configure(fg=OK_FG)
-                self.entry.unbind("<Return>")  # prevents double-enter skip
+                self.entry.unbind("<Return>")
             self.master.after(200, self.next_character)
         else:
             self.wrong_flags[char] = True
