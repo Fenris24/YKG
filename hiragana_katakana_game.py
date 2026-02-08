@@ -25,13 +25,32 @@ class KanaGame:
         self.master = master
         self.master.title("Yappanese Kana Racer")
         self.master.configure(bg=BG_COLOR)
+        self.master.protocol("WM_DELETE_WINDOW", self.on_close)
 
         # Two toggles (menu-only)
         self.include_hiragana_var = tk.BooleanVar(value=True)
         self.include_katakana_var = tk.BooleanVar(value=True)
 
+        # Column selection toggles
+        self.columns = {
+            'a': tk.BooleanVar(value=True),
+            'k': tk.BooleanVar(value=True),
+            's': tk.BooleanVar(value=True),
+            't': tk.BooleanVar(value=True),
+            'n': tk.BooleanVar(value=True),
+            'h': tk.BooleanVar(value=True),
+            'm': tk.BooleanVar(value=True),
+            'y': tk.BooleanVar(value=True),
+            'r': tk.BooleanVar(value=True),
+            'w': tk.BooleanVar(value=True),
+        }
+        self.include_n_var = tk.BooleanVar(value=True)
+        self.include_dakuten_var = tk.BooleanVar(value=True)
+        self.include_handakuten_var = tk.BooleanVar(value=True)
+
         self.start_time = None
         self.timer_after_id = None
+        self.clear_timer_id = None
 
         self.kana_romaji = {
             'あ': 'a', 'い': 'i', 'う': 'u', 'え': 'e', 'お': 'o',
@@ -85,6 +104,7 @@ class KanaGame:
         self.hint_btn = None
         self.hint_label = None
         self.feedback = None
+        self.exit_dialog = None
 
         self.style = ttk.Style()
         try:
@@ -103,16 +123,69 @@ class KanaGame:
     def _is_hiragana(ch: str) -> bool:
         return 'ぁ' <= ch <= 'ゟ'
 
+    def _get_column(self, romaji: str) -> str | None:
+        """Return the column name for a given romaji (e.g., 'k', 's', 'n'), or None."""
+        if romaji in ('a', 'i', 'u', 'e', 'o'):
+            return 'a'
+        elif romaji.startswith('ka') or romaji.startswith('ki') or romaji.startswith('ku') or romaji.startswith('ke') or romaji.startswith('ko') or romaji.startswith('ga') or romaji.startswith('gi') or romaji.startswith('gu') or romaji.startswith('ge') or romaji.startswith('go'):
+            return 'k'
+        elif romaji.startswith('sa') or romaji.startswith('shi') or romaji.startswith('su') or romaji.startswith('se') or romaji.startswith('so') or romaji.startswith('za') or romaji.startswith('ji') or romaji.startswith('zu') or romaji.startswith('ze') or romaji.startswith('zo'):
+            return 's'
+        elif romaji.startswith('ta') or romaji.startswith('chi') or romaji.startswith('tsu') or romaji.startswith('te') or romaji.startswith('to') or romaji.startswith('da') or romaji.startswith('de') or romaji.startswith('do'):
+            return 't'
+        elif romaji.startswith('na') or romaji.startswith('ni') or romaji.startswith('nu') or romaji.startswith('ne') or romaji.startswith('no'):
+            return 'n'
+        elif romaji.startswith('ha') or romaji.startswith('hi') or romaji.startswith('fu') or romaji.startswith('he') or romaji.startswith('ho') or romaji.startswith('ba') or romaji.startswith('bi') or romaji.startswith('bu') or romaji.startswith('be') or romaji.startswith('bo') or romaji.startswith('pa') or romaji.startswith('pi') or romaji.startswith('pu') or romaji.startswith('pe') or romaji.startswith('po'):
+            return 'h'
+        elif romaji.startswith('ma') or romaji.startswith('mi') or romaji.startswith('mu') or romaji.startswith('me') or romaji.startswith('mo'):
+            return 'm'
+        elif romaji.startswith('ya') or romaji.startswith('yu') or romaji.startswith('yo'):
+            return 'y'
+        elif romaji.startswith('ra') or romaji.startswith('ri') or romaji.startswith('ru') or romaji.startswith('re') or romaji.startswith('ro'):
+            return 'r'
+        elif romaji.startswith('wa') or romaji.startswith('wo'):
+            return 'w'
+        elif romaji == 'n':
+            return 'nn'
+        return None
+
     def build_deck(self) -> None:
         include_hiragana = self.include_hiragana_var.get()
         include_katakana = self.include_katakana_var.get()
+        include_dakuten = self.include_dakuten_var.get()
+        include_handakuten = self.include_handakuten_var.get()
 
         items = []
         for ch, romaji in self.kana_romaji.items():
+            # Check if character type is enabled
             if include_hiragana and self._is_hiragana(ch):
-                items.append((ch, romaji))
+                pass
             elif include_katakana and self._is_katakana(ch):
-                items.append((ch, romaji))
+                pass
+            else:
+                continue
+
+            # Check if column is enabled
+            column = self._get_column(romaji)
+            if column is None:
+                continue
+            
+            if column == 'nn':
+                if not self.include_n_var.get():
+                    continue
+            else:
+                if not self.columns[column].get():
+                    continue
+
+            # Dakuten / handakuten filters
+            if romaji.startswith(('ga', 'gi', 'gu', 'ge', 'go', 'za', 'ji', 'zu', 'ze', 'zo', 'da', 'de', 'do', 'ba', 'bi', 'bu', 'be', 'bo')):
+                if not include_dakuten:
+                    continue
+            elif romaji.startswith(('pa', 'pi', 'pu', 'pe', 'po')):
+                if not include_handakuten:
+                    continue
+
+            items.append((ch, romaji))
 
         random.shuffle(items)
         self.kana_list = items
@@ -121,9 +194,117 @@ class KanaGame:
         self.wrong_flags = {char: False for char, _ in self.kana_list}
         self.hint_flags = {char: False for char, _ in self.kana_list}
 
+    def open_column_menu(self) -> None:
+        """Open a dialog to select columns and 'n'."""
+        dialog = tk.Toplevel(self.master)
+        dialog.title("Select Columns")
+        dialog.geometry("400x600")
+        dialog.configure(bg=BG_COLOR)
+
+        tk.Label(
+            dialog,
+            text="Select Columns to Practice:",
+            font=("Helvetica", 12, "bold"),
+            bg=BG_COLOR,
+            fg=FG_COLOR
+        ).pack(pady=20)
+
+        columns_frame = tk.Frame(dialog, bg=BG_COLOR)
+        columns_frame.pack(pady=10)
+
+        # Column display names
+        column_names = {
+            'a': 'A (あ・ア)',
+            'k': 'K (か・カ)',
+            's': 'S (さ・サ)',
+            't': 'T (た・タ)',
+            'n': 'N (な・ナ)',
+            'h': 'H (は・ハ)',
+            'm': 'M (ま・マ)',
+            'y': 'Y (や・ヤ)',
+            'r': 'R (ら・ラ)',
+            'w': 'W (わ・ワ)',
+            'nn': 'N (ん・ン)',
+        }
+
+        for col_key, col_name in column_names.items():
+            ttk.Checkbutton(
+                columns_frame,
+                text=col_name,
+                variable=self.columns[col_key] if col_key != 'nn' else self.include_n_var,
+            ).pack(anchor="w", padx=10, pady=5)
+
+        toggle_btn = tk.Button(
+            dialog,
+            text="",
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
+        )
+        toggle_btn.pack(pady=10)
+
+        def update_toggle_btn_text(*args):
+            try:
+                all_selected = all(var.get() for var in self.columns.values()) and self.include_n_var.get()
+                toggle_btn.config(text="Unselect All" if all_selected else "Select All")
+            except:
+                pass  # Button was destroyed when dialog closed
+
+        def toggle_all():
+            all_selected = all(var.get() for var in self.columns.values()) and self.include_n_var.get()
+            new_state = not all_selected
+            for var in self.columns.values():
+                var.set(new_state)
+            self.include_n_var.set(new_state)
+            update_toggle_btn_text()
+
+        # Add traces to update button text when checkboxes change
+        for var in self.columns.values():
+            var.trace_add('write', update_toggle_btn_text)
+        self.include_n_var.trace_add('write', update_toggle_btn_text)
+
+        toggle_btn.config(command=toggle_all)
+        update_toggle_btn_text()
+
+        # Dakuten / handakuten toggles (not affected by Select/Unselect All)
+        toggles_frame = tk.Frame(dialog, bg=BG_COLOR)
+        toggles_frame.pack(pady=(10, 10))
+
+        ttk.Checkbutton(
+            toggles_frame,
+            text="Dakuten",
+            variable=self.include_dakuten_var,
+        ).pack(anchor="w", padx=10, pady=2)
+
+        ttk.Checkbutton(
+            toggles_frame,
+            text="Handakuten",
+            variable=self.include_handakuten_var,
+        ).pack(anchor="w", padx=10, pady=2)
+
     def on_tab_hint(self, _event: tk.Event):
         self.show_hint()
         return "break"
+
+    def on_key_press(self, event: tk.Event):
+        """Handle key press - clear immediately if entry is red from wrong answer."""
+        if self.entry is not None and str(self.entry.cget("fg")) == BAD_FG:
+            # Cancel pending clear timer
+            if self.clear_timer_id is not None:
+                try:
+                    self.master.after_cancel(self.clear_timer_id)
+                except Exception:
+                    pass
+                self.clear_timer_id = None
+            
+            # Clear immediately and reset color
+            if self.entry_var is not None:
+                self.entry_var.set("")
+            self.entry.configure(fg=ENTRY_FG)
+        # Let the key event continue normally
+        return None
 
     def stop_timer(self):
         if self.timer_after_id is not None:
@@ -194,7 +375,7 @@ class KanaGame:
             font=("Helvetica", 12),
             bg=BG_COLOR,
             fg=FG_COLOR
-        ).pack(pady=10)
+        ).pack(pady=(10, 4))
 
         # Message area for invalid selection (both toggles off)
         self.menu_msg = tk.Label(self.start_frame, text="", font=("Helvetica", 11), bg=BG_COLOR, fg=BAD_FG)
@@ -208,8 +389,9 @@ class KanaGame:
             fg=BTN_FG,
             activebackground=BTN_BG,
             activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
             command=lambda: self.start_game("classic")
-        ).pack(pady=5)
+        ).pack(pady=3)
 
         tk.Button(
             self.start_frame,
@@ -219,31 +401,48 @@ class KanaGame:
             fg=BTN_FG,
             activebackground=BTN_BG,
             activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
             command=lambda: self.start_game("endless")
-        ).pack(pady=5)
+        ).pack(pady=3)
 
         tk.Button(
             self.start_frame,
-            text="Quit",
+            text="Select Columns",
             width=20,
             bg=BTN_BG,
             fg=BTN_FG,
             activebackground=BTN_BG,
             activeforeground=BTN_FG,
-            command=self.master.quit
-        ).pack(pady=5)
+            highlightbackground=BG_COLOR,
+            command=self.open_column_menu
+        ).pack(pady=(14, 5))
 
     def start_game(self, mode: str) -> None:
+        self.master.unbind("<Return>")
         # Must have at least one set enabled
         if not self.include_hiragana_var.get() and not self.include_katakana_var.get():
             if hasattr(self, "menu_msg") and self.menu_msg is not None:
                 self.menu_msg.config(text="Enable Hiragana and/or Katakana to start.")
             return
+        
+        # Check if at least one column is selected
+        any_column_selected = any(var.get() for var in self.columns.values()) or self.include_n_var.get()
+        if not any_column_selected:
+            if hasattr(self, "menu_msg") and self.menu_msg is not None:
+                self.menu_msg.config(text="Select at least one column to practice.")
+            return
+        
         if hasattr(self, "menu_msg") and self.menu_msg is not None:
             self.menu_msg.config(text="")
 
         self.mode = mode
         self.build_deck()
+        
+        # Check if deck has characters
+        if not self.kana_list:
+            if hasattr(self, "menu_msg") and self.menu_msg is not None:
+                self.menu_msg.config(text="No characters available with current selection.")
+            return
 
         self.clear_frame(self.game_frame)
         self.start_frame.pack_forget()
@@ -277,6 +476,7 @@ class KanaGame:
         )
         self.entry.pack()
         self.entry.bind("<Return>", self.check_answer)
+        self.entry.bind("<KeyPress>", self.on_key_press)
 
         self.entry.bind("<Tab>", self.on_tab_hint)
         self.master.bind("<Tab>", self.on_tab_hint)
@@ -292,6 +492,7 @@ class KanaGame:
             fg=BTN_FG,
             activebackground=BTN_BG,
             activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
             command=self.show_hint
         )
         self.hint_btn.pack(side="left", padx=(0, 10))
@@ -376,13 +577,14 @@ class KanaGame:
             self.wrong_flags[char] = True
             if self.entry is not None:
                 self.entry.configure(fg=BAD_FG)
-            self.master.after(1000, self.clear_entry)
+            self.clear_timer_id = self.master.after(1000, self.clear_entry)
 
     def next_character(self) -> None:
         self.current_index += 1
         self.show_character()
 
     def clear_entry(self) -> None:
+        self.clear_timer_id = None
         if self.entry_var is not None:
             self.entry_var.set("")
         if self.entry is not None:
@@ -428,6 +630,7 @@ class KanaGame:
             fg=BTN_FG,
             activebackground=BTN_BG,
             activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
             command=lambda: self.start_game(self.mode)
         ).pack(pady=5)
 
@@ -439,17 +642,94 @@ class KanaGame:
             fg=BTN_FG,
             activebackground=BTN_BG,
             activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
             command=self.return_to_start
         ).pack(pady=5)
+
+        self.result_frame.bind("<Return>", self._on_result_enter)
+        self.result_frame.focus_set()
 
     def return_to_start(self) -> None:
         self.stop_timer()
         self.start_time = None
 
+        self.result_frame.unbind("<Return>")
+
         self.result_frame.pack_forget()
         self.game_frame.pack_forget()
         self.mode = None
         self.setup_start_screen()
+
+    def _on_result_enter(self, _event: tk.Event) -> None:
+        self.start_game(self.mode)
+
+    def on_close(self) -> None:
+        """Handle window close button."""
+        if self.result_frame.winfo_ismapped():
+            # If on results screen, close the application
+            self.master.destroy()
+        elif self.game_frame.winfo_ismapped():
+            # If in game, show custom menu dialog
+            self.show_exit_menu()
+        else:
+            # If in main menu, close the application
+            self.master.destroy()
+
+    def show_exit_menu(self) -> None:
+        """Show exit menu during game with Go to Menu and Quit options."""
+        # If dialog already exists, focus on it
+        if self.exit_dialog is not None and self.exit_dialog.winfo_exists():
+            self.exit_dialog.focus_force()
+            return
+        
+        dialog = tk.Toplevel(self.master)
+        self.exit_dialog = dialog
+        dialog.title("Exit Game")
+        dialog.geometry("240x60")
+        dialog.configure(bg=BG_COLOR)
+        
+        buttons_frame = tk.Frame(dialog, bg=BG_COLOR)
+        buttons_frame.pack(padx=20, pady=(15, 5))
+        
+        def on_menu():
+            self.exit_dialog = None
+            dialog.destroy()
+            self.return_to_start()
+        
+        def on_quit():
+            self.exit_dialog = None
+            dialog.destroy()
+            self.master.destroy()
+        
+        def on_close():
+            self.exit_dialog = None
+            dialog.destroy()
+        
+        dialog.protocol("WM_DELETE_WINDOW", on_close)
+        
+        tk.Button(
+            buttons_frame,
+            text="Go to Menu",
+            width=8,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
+            command=on_menu
+        ).pack(side="left", padx=5)
+        
+        tk.Button(
+            buttons_frame,
+            text="Quit",
+            width=8,
+            bg=BTN_BG,
+            fg=BTN_FG,
+            activebackground=BTN_BG,
+            activeforeground=BTN_FG,
+            highlightbackground=BG_COLOR,
+            command=on_quit
+        ).pack(side="left", padx=5)
 
     @staticmethod
     def clear_frame(frame: tk.Frame) -> None:
