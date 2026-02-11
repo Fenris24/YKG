@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QFrame,
     QCheckBox, QButtonGroup, QRadioButton
@@ -32,7 +33,7 @@ class TimerSpeed(Enum):
     VERY_FAST = "very_fast"
 
     def label(self) -> str:
-        return "Fast" if self is TimerSpeed.FAST else "Very fast"
+        return "Fast (2s)" if self is TimerSpeed.FAST else "Very fast (1s)"
 
 
 @dataclass
@@ -59,39 +60,34 @@ class KanaMenu(QWidget):
         self._connect_signals()
         self._refresh_ui()
 
-    # ---------------- UI construction ----------------
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 24, 24, 24)
         root.setSpacing(16)
 
-        # Card container
         card = QFrame()
         card.setObjectName("Card")
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(22, 22, 22, 22)
         card_layout.setSpacing(14)
 
-        # Header
         title = QLabel("Yappanese Kana Guesser")
         title.setObjectName("Title")
         title.setAlignment(Qt.AlignHCenter)
         card_layout.addWidget(title)
 
-        subtitle = QLabel("Choose your mode and options.")
-        subtitle.setAlignment(Qt.AlignHCenter)
-        card_layout.addWidget(subtitle)
-
-        # Content: left (mode buttons) + right (options)
         content = QHBoxLayout()
         content.setSpacing(18)
 
-        # Left side
         left = QVBoxLayout()
         left.setSpacing(10)
 
         self.kana_btn = QPushButton("Kana guesser")
         self.kana_mode_btn = QPushButton(self.opts.kana_mode.label())
+        mode_labels = [mode.label() for mode in KanaMode]
+        metrics = QFontMetrics(self.kana_mode_btn.font())
+        max_width = max(metrics.horizontalAdvance(label) for label in mode_labels)
+        self.kana_mode_btn.setFixedWidth(max_width + 40)
 
         kana_row = QHBoxLayout()
         kana_row.setSpacing(10)
@@ -106,7 +102,6 @@ class KanaMenu(QWidget):
         left.addWidget(self.back_btn)
         left.addStretch(1)
 
-        # Right side (options)
         right = QVBoxLayout()
         right.setSpacing(8)
 
@@ -117,21 +112,20 @@ class KanaMenu(QWidget):
         self.endless_cb = QCheckBox("Endless")
         self.sudden_death_cb = QCheckBox("Sudden death")
         self.no_help_cb = QCheckBox("No help")
-        self.timer_cb = QCheckBox("Timer")
+        self.timer_cb = QCheckBox("Death timer")
 
         right.addWidget(self.endless_cb)
         right.addWidget(self.sudden_death_cb)
         right.addWidget(self.no_help_cb)
         right.addWidget(self.timer_cb)
 
-        # Timer speed (shown only when timer enabled)
         self.timer_speed_box = QFrame()
         timer_speed_layout = QVBoxLayout(self.timer_speed_box)
         timer_speed_layout.setContentsMargins(18, 4, 0, 0)
         timer_speed_layout.setSpacing(6)
 
-        self.fast_rb = QRadioButton("Fast")
-        self.very_fast_rb = QRadioButton("Very fast")
+        self.fast_rb = QRadioButton("Fast (2s)")
+        self.very_fast_rb = QRadioButton("Very fast (1s)")
 
         self.timer_speed_group = QButtonGroup(self)
         self.timer_speed_group.setExclusive(True)
@@ -144,7 +138,6 @@ class KanaMenu(QWidget):
         right.addWidget(self.timer_speed_box)
         right.addStretch(1)
 
-        # Compose
         content.addLayout(left, 3)
         content.addLayout(right, 2)
         card_layout.addLayout(content)
@@ -153,7 +146,6 @@ class KanaMenu(QWidget):
         root.addWidget(card)
         root.addStretch(1)
 
-    # ---------------- Wiring / behavior ----------------
     def _connect_signals(self) -> None:
         # Navigation signals
         self.kana_btn.clicked.connect(self.kana_clicked.emit)
@@ -169,12 +161,10 @@ class KanaMenu(QWidget):
         self.no_help_cb.toggled.connect(self._on_no_help_toggled)
         self.timer_cb.toggled.connect(self._on_timer_toggled)
 
-        # Timer speed radios -> update model
         self.fast_rb.toggled.connect(lambda on: on and self._set_timer_speed(TimerSpeed.FAST))
         self.very_fast_rb.toggled.connect(lambda on: on and self._set_timer_speed(TimerSpeed.VERY_FAST))
 
     def _refresh_ui(self) -> None:
-        # Reflect model -> widgets (used after changes)
         self.kana_mode_btn.setText(self.opts.kana_mode.label())
 
         self.endless_cb.setChecked(self.opts.endless)
@@ -189,13 +179,11 @@ class KanaMenu(QWidget):
             else:
                 self.very_fast_rb.setChecked(True)
         else:
-            # When timer is off, no selection shown
             self.timer_speed_group.setExclusive(False)
             self.fast_rb.setChecked(False)
             self.very_fast_rb.setChecked(False)
             self.timer_speed_group.setExclusive(True)
 
-    # ---------------- Handlers ----------------
     def _cycle_kana_mode(self) -> None:
         self.opts.kana_mode = self.opts.kana_mode.next()
         self.kana_mode_btn.setText(self.opts.kana_mode.label())
@@ -213,13 +201,11 @@ class KanaMenu(QWidget):
         self.opts.timer = enabled
         self.timer_speed_box.setVisible(enabled)
 
-        # If timer gets enabled and nothing selected yet, default to FAST
         if enabled:
             if not self.fast_rb.isChecked() and not self.very_fast_rb.isChecked():
                 self.opts.timer_speed = TimerSpeed.FAST
                 self.fast_rb.setChecked(True)
         else:
-            # Clear visible selection when timer off (keep default in model if you want)
             self.timer_speed_group.setExclusive(False)
             self.fast_rb.setChecked(False)
             self.very_fast_rb.setChecked(False)
@@ -228,7 +214,6 @@ class KanaMenu(QWidget):
     def _set_timer_speed(self, speed: TimerSpeed) -> None:
         self.opts.timer_speed = speed
 
-    # ---------------- Public API ----------------
     def options(self) -> KanaOptions:
         """Return current options model (copy if you prefer immutability)."""
         return self.opts
